@@ -157,9 +157,12 @@ Push this repository to GitHub, then in Render select **New +** -> **Blueprint**
 
 The Blueprint is intentionally configured with `plan: free` for every Render resource. The API process handles BullMQ jobs directly; there is no paid Render background worker.
 
-The Blueprint applies pending migrations when the free API starts, then launches the service:
+The Blueprint installs dependencies, builds the API, then applies pending migrations when the free API starts:
 
 ```bash
+pnpm install --frozen-lockfile
+pnpm --filter @cartparty/api prisma:generate
+pnpm --filter @cartparty/api build
 pnpm --filter @cartparty/api prisma:deploy && pnpm --filter @cartparty/api start:prod
 ```
 
