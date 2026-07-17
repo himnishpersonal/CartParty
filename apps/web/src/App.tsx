@@ -7,12 +7,14 @@ import {
   LogOut,
   MessageCircle,
   PackagePlus,
+  Pencil,
   Plus,
   ReceiptText,
   RefreshCw,
   ShoppingBag,
   Star,
   ThumbsDown,
+  Trash2,
   UserPlus,
   Users,
   X
@@ -227,6 +229,11 @@ export function App() {
             presenceUsers={presenceUsers}
             onCreated={() => loadWorkspaceProducts()}
             onMembersChanged={() => loadWorkspaces(workspaceId)}
+            onWorkspaceChanged={() => loadWorkspaces(workspaceId)}
+            onWorkspaceDeleted={() => {
+              setSelectedId(null);
+              void loadWorkspaces();
+            }}
             onError={setError}
           />
 
@@ -258,8 +265,17 @@ export function App() {
             <ProductDetail
               product={selected}
               flashPrice={selected.id === priceFlashId}
+              canManage={selected.adder.id === currentUserId || activeWorkspace?.members?.some((member) => member.user.id === currentUserId && member.role === "owner") === true}
               onClose={() => setSelectedId(null)}
-              onRefresh={() => loadWorkspaceProducts()}
+              onRefresh={() => {
+                void loadWorkspaceProducts();
+                void loadActivity();
+              }}
+              onDeleted={() => {
+                setSelectedId(null);
+                void loadWorkspaceProducts();
+                void loadActivity();
+              }}
               onError={setError}
             />
           ) : <DecisionSnapshot products={products} onSelect={() => setSelectedId(products[0]?.id ?? null)} />}
@@ -413,13 +429,15 @@ function WorkspaceSidebar(props: {
   );
 }
 
-function BoardHeader({ workspace, products, currentUserId, presenceUsers, onCreated, onMembersChanged, onError }: {
+function BoardHeader({ workspace, products, currentUserId, presenceUsers, onCreated, onMembersChanged, onWorkspaceChanged, onWorkspaceDeleted, onError }: {
   workspace?: Workspace;
   products: Product[];
   currentUserId: string | null;
   presenceUsers: User[];
   onCreated: () => void;
   onMembersChanged: () => Promise<void>;
+  onWorkspaceChanged: () => Promise<void>;
+  onWorkspaceDeleted: () => void;
   onError: (message: string) => void;
 }) {
   const picked = products.filter((product) => voteCounts(product).love >= 2 || voteCounts(product).favorite >= 2).length;
@@ -432,10 +450,79 @@ function BoardHeader({ workspace, products, currentUserId, presenceUsers, onCrea
       </div>
       <div className="board-header__actions">
         <Presence users={presenceUsers} />
+        <ManageWorkspace workspace={workspace} currentUserId={currentUserId} onChanged={onWorkspaceChanged} onDeleted={onWorkspaceDeleted} onError={onError} />
         <InviteMembers workspace={workspace} currentUserId={currentUserId} onMembersChanged={onMembersChanged} onError={onError} />
         <CreateProduct workspaceId={workspace?.id ?? ""} onCreated={onCreated} onError={onError} />
       </div>
     </header>
+  );
+}
+
+function ManageWorkspace({ workspace, currentUserId, onChanged, onDeleted, onError }: {
+  workspace?: Workspace;
+  currentUserId: string | null;
+  onChanged: () => Promise<void>;
+  onDeleted: () => void;
+  onError: (message: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(workspace?.name ?? "");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const membership = workspace?.members?.find((member) => member.user.id === currentUserId);
+
+  useEffect(() => {
+    setName(workspace?.name ?? "");
+    setOpen(false);
+    setConfirmingDelete(false);
+  }, [workspace?.id, workspace?.name]);
+
+  if (!workspace || membership?.role !== "owner") return null;
+  const activeWorkspace = workspace;
+
+  async function rename(event: React.FormEvent) {
+    event.preventDefault();
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    try {
+      await api.patch(`/workspaces/${activeWorkspace.id}`, { name: name.trim() });
+      await onChanged();
+      setOpen(false);
+    } catch {
+      onError("The workspace name did not update. Keep the name and retry.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteWorkspace() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await api.delete(`/workspaces/${activeWorkspace.id}`);
+      onDeleted();
+    } catch {
+      onError("The workspace could not be deleted. Retry when the connection is ready.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="workspace-manage">
+      <button className="icon-button" type="button" title="Manage workspace" aria-label="Manage workspace" onClick={() => setOpen((value) => !value)}><Pencil size={16} /></button>
+      {open ? (
+        <section className="workspace-manage__popover" role="dialog" aria-label={`Manage ${activeWorkspace.name}`}>
+          <div className="workspace-manage__header"><div><p className="eyebrow">Workspace settings</p><h2>Manage workspace</h2></div><button className="icon-button" type="button" title="Close" aria-label="Close workspace settings" onClick={() => setOpen(false)}><X size={17} /></button></div>
+          <form onSubmit={rename}>
+            <Field label="Workspace name" value={name} onChange={setName} />
+            <button className="primary-button" type="submit" disabled={saving || !name.trim()}><Check size={16} /> {saving ? "Saving..." : "Save name"}</button>
+          </form>
+          <div className="workspace-manage__danger">
+            {confirmingDelete ? <div className="product-delete-confirm" role="alert"><span>Delete this workspace and all of its products, votes, comments, price history, and activity?</span><div><button className="secondary-button" type="button" onClick={() => setConfirmingDelete(false)}>Keep workspace</button><button className="danger-button" type="button" disabled={saving} onClick={deleteWorkspace}><Trash2 size={15} /> {saving ? "Deleting..." : "Delete workspace"}</button></div></div> : <button className="text-button text-button--danger" type="button" onClick={() => setConfirmingDelete(true)}><Trash2 size={15} /> Delete workspace</button>}
+          </div>
+        </section>
+      ) : null}
+    </div>
   );
 }
 
@@ -646,13 +733,22 @@ function VoteButton({ type, count, selected, onClick }: { type: VoteType; count:
   );
 }
 
-function ProductDetail({ product, flashPrice, onClose, onRefresh, onError }: { product: Product; flashPrice: boolean; onClose: () => void; onRefresh: () => void; onError: (message: string) => void }) {
+function ProductDetail({ product, flashPrice, canManage, onClose, onRefresh, onDeleted, onError }: { product: Product; flashPrice: boolean; canManage: boolean; onClose: () => void; onRefresh: () => void; onDeleted: () => void; onError: (message: string) => void }) {
   const [body, setBody] = useState("");
   const [price, setPrice] = useState(String(product.currentPrice ?? ""));
   const [editingPrice, setEditingPrice] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [productSaving, setProductSaving] = useState(false);
+  const [form, setForm] = useState(productFormValues(product));
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => setPrice(String(product.currentPrice ?? "")), [product.currentPrice]);
+  useEffect(() => {
+    setPrice(String(product.currentPrice ?? ""));
+    setForm(productFormValues(product));
+    setEditingProduct(false);
+    setConfirmingDelete(false);
+  }, [product]);
 
   async function comment(event: React.FormEvent) {
     event.preventDefault();
@@ -680,6 +776,40 @@ function ProductDetail({ product, flashPrice, onClose, onRefresh, onError }: { p
     }
   }
 
+  async function updateProduct(event: React.FormEvent) {
+    event.preventDefault();
+    if (!form.title.trim() || productSaving) return;
+    setProductSaving(true);
+    try {
+      await api.patch(`/products/${product.id}`, {
+        title: form.title.trim(),
+        storeName: form.storeName.trim() || undefined,
+        productUrl: form.productUrl.trim() || undefined,
+        imageUrl: form.imageUrl.trim() || undefined,
+        currentPrice: form.currentPrice ? Number(form.currentPrice) : undefined,
+        notes: form.notes.trim() || undefined
+      });
+      setEditingProduct(false);
+      onRefresh();
+    } catch {
+      onError("This product did not update. Keep your changes and retry.");
+    } finally {
+      setProductSaving(false);
+    }
+  }
+
+  async function deleteProduct() {
+    if (productSaving) return;
+    setProductSaving(true);
+    try {
+      await api.delete(`/products/${product.id}`);
+      onDeleted();
+    } catch {
+      onError("This product could not be deleted. Retry when the connection is ready.");
+      setProductSaving(false);
+    }
+  }
+
   return (
     <section className="detail-panel" aria-labelledby="detail-title">
       <header className="detail-panel__header">
@@ -687,8 +817,26 @@ function ProductDetail({ product, flashPrice, onClose, onRefresh, onError }: { p
           <p className="eyebrow">{product.storeName ?? "Product detail"}</p>
           <h2 id="detail-title">{product.title}</h2>
         </div>
-        <button className="icon-button" title="Close detail" aria-label="Close product detail" onClick={onClose}><X size={17} /></button>
+        <div className="detail-panel__actions">
+          {canManage ? <button className="icon-button" title="Edit product" aria-label="Edit product" onClick={() => setEditingProduct((value) => !value)}><Pencil size={16} /></button> : null}
+          <button className="icon-button" title="Close detail" aria-label="Close product detail" onClick={onClose}><X size={17} /></button>
+        </div>
       </header>
+
+      {editingProduct ? (
+        <form className="product-editor" onSubmit={updateProduct}>
+          <div className="product-editor__heading"><span>Edit product</span><button className="text-button" type="button" onClick={() => setEditingProduct(false)}>Cancel</button></div>
+          <Field label="Product name" value={form.title} onChange={(value) => setForm({ ...form, title: value })} />
+          <div className="form-row">
+            <Field label="Brand or store" value={form.storeName} onChange={(value) => setForm({ ...form, storeName: value })} />
+            <Field label="Current price" value={form.currentPrice} onChange={(value) => setForm({ ...form, currentPrice: value })} type="number" />
+          </div>
+          <Field label="Product URL" value={form.productUrl} onChange={(value) => setForm({ ...form, productUrl: value })} type="url" />
+          <Field label="Image URL" value={form.imageUrl} onChange={(value) => setForm({ ...form, imageUrl: value })} type="url" />
+          <Field label="Note for the group" value={form.notes} onChange={(value) => setForm({ ...form, notes: value })} />
+          <button className="primary-button" disabled={productSaving} type="submit"><Check size={16} /> {productSaving ? "Saving..." : "Save changes"}</button>
+        </form>
+      ) : null}
 
       <div className="detail-panel__price">
         <PriceTag value={product.currentPrice} currency={product.currency} delta={priceDelta(product)} flash={flashPrice} />
@@ -703,6 +851,17 @@ function ProductDetail({ product, flashPrice, onClose, onRefresh, onError }: { p
           <input id="price-edit" type="number" step="0.01" value={price} onChange={(event) => setPrice(event.target.value)} />
           <button className="primary-button" type="submit">Save</button>
         </form>
+      ) : null}
+
+      {canManage ? (
+        <div className="product-danger-zone">
+          {confirmingDelete ? (
+            <div className="product-delete-confirm" role="alert">
+              <span>Delete this product and its votes, comments, and price history?</span>
+              <div><button className="secondary-button" type="button" onClick={() => setConfirmingDelete(false)}>Keep product</button><button className="danger-button" type="button" disabled={productSaving} onClick={deleteProduct}><Trash2 size={15} /> {productSaving ? "Deleting..." : "Delete"}</button></div>
+            </div>
+          ) : <button className="text-button text-button--danger" type="button" onClick={() => setConfirmingDelete(true)}><Trash2 size={15} /> Delete product</button>}
+        </div>
       ) : null}
 
       <div className="chart-block">
@@ -727,6 +886,17 @@ function ProductDetail({ product, flashPrice, onClose, onRefresh, onError }: { p
       </div>
     </section>
   );
+}
+
+function productFormValues(product: Product) {
+  return {
+    title: product.title,
+    storeName: product.storeName ?? "",
+    productUrl: product.productUrl ?? "",
+    imageUrl: product.imageUrl ?? "",
+    currentPrice: product.currentPrice == null ? "" : String(product.currentPrice),
+    notes: product.notes ?? ""
+  };
 }
 
 function PriceHistoryChart({ points, currency }: { points: Product["priceHistory"]; currency: string }) {

@@ -36,6 +36,20 @@ export class CartService {
     });
   }
 
+  async updateWorkspace(workspaceId: string, userId: string, name: string) {
+    await this.ensureWorkspaceOwner(workspaceId, userId);
+    return this.prisma.workspace.update({
+      where: { id: workspaceId },
+      data: { name: name.trim() },
+      include: { members: { include: { user: { select: { id: true, name: true, email: true } } } }, _count: { select: { products: true } } }
+    });
+  }
+
+  async deleteWorkspace(workspaceId: string, userId: string) {
+    await this.ensureWorkspaceOwner(workspaceId, userId);
+    return this.prisma.workspace.delete({ where: { id: workspaceId } });
+  }
+
   async listWorkspaces(userId: string) {
     return this.prisma.workspace.findMany({
       where: { members: { some: { userId } } },
@@ -102,8 +116,7 @@ export class CartService {
   }
 
   async updateProduct(productId: string, userId: string, dto: UpdateProductDto) {
-    const workspaceId = await this.workspaceForProduct(productId);
-    await this.ensureWorkspaceMember(workspaceId, userId);
+    await this.ensureProductManager(productId, userId);
     return this.prisma.product.update({
       where: { id: productId },
       data: {
@@ -120,8 +133,7 @@ export class CartService {
   }
 
   async deleteProduct(productId: string, userId: string) {
-    const workspaceId = await this.workspaceForProduct(productId);
-    await this.ensureWorkspaceMember(workspaceId, userId);
+    await this.ensureProductManager(productId, userId);
     return this.prisma.product.delete({ where: { id: productId } });
   }
 
@@ -199,6 +211,25 @@ export class CartService {
       priceHistory: { take: 12, orderBy: { recordedAt: "asc" as const } },
       adder: { select: { id: true, name: true, email: true } }
     };
+  }
+
+  private async ensureProductManager(productId: string, userId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { workspaceId: true, addedBy: true }
+    });
+    if (!product) throw new NotFoundException("Product not found");
+    const membership = await this.ensureWorkspaceMember(product.workspaceId, userId);
+    if (product.addedBy !== userId && membership.role !== "owner") {
+      throw new ForbiddenException("Only the product creator or workspace owner can manage this product");
+    }
+    return product;
+  }
+
+  private async ensureWorkspaceOwner(workspaceId: string, userId: string) {
+    const membership = await this.ensureWorkspaceMember(workspaceId, userId);
+    if (membership.role !== "owner") throw new ForbiddenException("Only the workspace owner can manage this workspace");
+    return membership;
   }
 
   private async voteCounts(productId: string) {

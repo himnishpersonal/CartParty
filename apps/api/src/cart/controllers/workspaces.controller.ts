@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { CurrentUser, RequestUser } from "../../auth/current-user.decorator";
 import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
-import { CreateWorkspaceDto, InviteMemberDto } from "../dto";
+import { CreateWorkspaceDto, InviteMemberDto, UpdateWorkspaceDto } from "../dto";
 import { CartService } from "../services/cart.service";
 
 @UseGuards(JwtAuthGuard)
@@ -22,6 +22,16 @@ export class WorkspacesController {
   @Get(":id")
   get(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.cart.getWorkspace(id, user.id);
+  }
+
+  @Patch(":id")
+  update(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateWorkspaceDto) {
+    return this.cart.updateWorkspace(id, user.id, dto.name);
+  }
+
+  @Delete(":id")
+  delete(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.cart.deleteWorkspace(id, user.id);
   }
 
   @Post(":id/members")

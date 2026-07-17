@@ -613,6 +613,41 @@ h3 {
   position: relative;
 }
 
+.workspace-manage {
+  position: relative;
+}
+
+.workspace-manage__popover {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-detail);
+  padding: var(--space-5);
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  width: 360px;
+  z-index: 30;
+}
+
+.workspace-manage__header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.workspace-manage__header h2 {
+  font-size: var(--type-h2);
+  margin-top: var(--space-1);
+}
+
+.workspace-manage__danger {
+  border-top: 1px solid var(--line);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+}
+
 .product-form {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -917,6 +952,11 @@ h3 {
   margin-top: var(--space-1);
 }
 
+.detail-panel__actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .detail-panel__price {
   padding: var(--space-3) var(--space-4) 0;
 }
@@ -944,6 +984,80 @@ h3 {
 .price-editor input {
   height: 40px;
   padding: var(--space-2) var(--space-3);
+}
+
+.product-editor {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  padding: var(--space-4);
+}
+
+.product-editor__heading,
+.product-delete-confirm,
+.product-delete-confirm > div,
+.text-button--danger {
+  align-items: center;
+  display: flex;
+}
+
+.product-editor__heading {
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.product-editor__heading > span {
+  font-family: var(--font-display);
+  font-size: var(--type-h2);
+  font-weight: 600;
+}
+
+.product-editor .primary-button {
+  justify-self: start;
+}
+
+.product-danger-zone {
+  border-bottom: 1px solid var(--line);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.text-button--danger {
+  color: var(--pass);
+  gap: var(--space-1);
+}
+
+.product-delete-confirm {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--pass) 6%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--pass) 24%, var(--line));
+  border-radius: var(--radius-button);
+  color: var(--pass);
+  flex-direction: column;
+  font-size: var(--type-label);
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.product-delete-confirm > div {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.danger-button {
+  align-items: center;
+  background: var(--pass);
+  border: 1px solid var(--pass);
+  border-radius: var(--radius-button);
+  color: var(--panel);
+  display: inline-flex;
+  font-size: var(--type-label);
+  font-weight: 600;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.danger-button:hover {
+  background: color-mix(in srgb, var(--pass) 88%, var(--ink));
 }
 
 .chart-block,

@@ -7,6 +7,11 @@ export class CreateWorkspaceDto {
   name!: string;
 }
 
+export class UpdateWorkspaceDto {
+  @IsString()
+  name!: string;
+}
+
 export class InviteMemberDto {
   @IsEmail()
   email!: string;
