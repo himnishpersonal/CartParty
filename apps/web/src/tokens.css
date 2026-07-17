@@ -1,0 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,450;0,500;0,600;1,450&family=Space+Grotesk:wght@600&display=swap");
+
+:root {
+  --ink: #1a1714;
+  --muted: #6b6560;
+  --canvas: #fcfbf9;
+  --panel: #ffffff;
+  --line: #e7e3dc;
+  --accent: #2b4eff;
+  --accent-ink: #1b34c4;
+  --vote: #0e9f6e;
+  --pass: #b4271f;
+  --drop: #e8590c;
+
+  --font-display: "Space Grotesk", "Arial Narrow", sans-serif;
+  --font-body: "Hanken Grotesk", Arial, sans-serif;
+
+  --type-display: 32px;
+  --type-h2: 20px;
+  --type-body: 15px;
+  --type-label: 13px;
+  --type-caption: 12px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-card: 10px;
+  --radius-chip: 6px;
+  --radius-button: 8px;
+
+  --shadow-detail: 0 18px 48px color-mix(in srgb, var(--ink) 12%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+
+  --motion-vote: 150ms;
+  --motion-print: 200ms;
+  --motion-drop: 500ms;
+}

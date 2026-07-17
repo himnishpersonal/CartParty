@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  owner
+  member
+}
+
+enum VoteType {
+  love
+  pass
+  favorite
+}
+
+enum ActivityType {
+  product_added
+  vote_cast
+  comment_added
+  price_dropped
+}
+
+model User {
+  id            String            @id @default(uuid()) @db.Uuid
+  email         String            @unique
+  passwordHash  String            @map("password_hash")
+  name          String
+  createdAt     DateTime          @default(now()) @map("created_at")
+  ownedSpaces   Workspace[]       @relation("WorkspaceOwner")
+  memberships   WorkspaceMember[]
+  products      Product[]
+  votes         Vote[]
+  comments      Comment[]
+  activity      ActivityEvent[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String            @id @default(uuid()) @db.Uuid
+  name        String
+  ownerId     String            @map("owner_id") @db.Uuid
+  createdAt   DateTime          @default(now()) @map("created_at")
+  owner       User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     WorkspaceMember[]
+  products    Product[]
+  activity    ActivityEvent[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  role        WorkspaceRole
+  joinedAt    DateTime      @default(now()) @map("joined_at")
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model Product {
+  id           String         @id @default(uuid()) @db.Uuid
+  workspaceId  String         @map("workspace_id") @db.Uuid
+  title        String
+  imageUrl     String?        @map("image_url")
+  productUrl   String?        @map("product_url")
+  storeName    String?        @map("store_name")
+  currentPrice Decimal?       @map("current_price") @db.Decimal(10, 2)
+  currency     String         @default("USD")
+  notes        String?
+  addedBy      String         @map("added_by") @db.Uuid
+  createdAt    DateTime       @default(now()) @map("created_at")
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  adder        User           @relation(fields: [addedBy], references: [id], onDelete: Cascade)
+  votes        Vote[]
+  comments     Comment[]
+  priceHistory PriceHistory[]
+
+  @@index([workspaceId])
+  @@map("products")
+}
+
+model Vote {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  voteType  VoteType @map("vote_type")
+  createdAt DateTime @default(now()) @map("created_at")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@map("votes")
+}
+
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("comments")
+}
+
+model PriceHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  productId  String   @map("product_id") @db.Uuid
+  price      Decimal  @db.Decimal(10, 2)
+  recordedAt DateTime @default(now()) @map("recorded_at")
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, recordedAt])
+  @@map("price_history")
+}
+
+model ActivityEvent {
+  id          String       @id @default(uuid()) @db.Uuid
+  workspaceId String       @map("workspace_id") @db.Uuid
+  actorId     String       @map("actor_id") @db.Uuid
+  eventType   ActivityType @map("event_type")
+  metadata    Json
+  createdAt   DateTime     @default(now()) @map("created_at")
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor       User         @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@map("activity_events")
+}
