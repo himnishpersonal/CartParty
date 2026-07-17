@@ -157,14 +157,13 @@ Push this repository to GitHub, then in Render select **New +** -> **Blueprint**
 
 The Blueprint is intentionally configured with `plan: free` for every Render resource. The API process handles BullMQ jobs directly; there is no paid Render background worker.
 
-The Blueprint configures these commands:
+The Blueprint applies pending migrations when the free API starts, then launches the service:
 
 ```bash
-pnpm --filter @cartparty/api prisma:deploy
-pnpm --filter @cartparty/api start:prod
+pnpm --filter @cartparty/api prisma:deploy && pnpm --filter @cartparty/api start:prod
 ```
 
-Migrations run only in the API pre-deploy step. Do not run `prisma:seed` against production.
+Do not run `prisma:seed` against production.
 
 ### 2. Vercel web app
 
@@ -202,7 +201,7 @@ CARTPARTY_PRICE_SCAN_SECRET=<same value as Render PRICE_SCAN_SECRET>
 ### 4. Release checklist
 
 1. Run `pnpm typecheck` and `pnpm build`.
-2. Deploy the Render Blueprint, allow `prisma:deploy` to finish, and verify `GET /health` returns `200`.
+2. Deploy the Render Blueprint, allow migrations and API startup to finish, and verify `GET /health` returns `200`.
 3. Add the two GitHub Actions secrets and manually run **Trigger price scan** once to verify the queue connects to Redis.
 4. Deploy the Vercel web app with the final Render API URL.
 5. Set `FRONTEND_URL` on Render to the final Vercel URL and restart the API if it was not known during Blueprint creation.

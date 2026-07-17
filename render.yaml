@@ -5,8 +5,7 @@ services:
     region: ohio
     plan: free
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @cartparty/api prisma:generate && pnpm --filter @cartparty/api build
-    preDeployCommand: pnpm --filter @cartparty/api prisma:deploy
-    startCommand: pnpm --filter @cartparty/api start:prod
+    startCommand: pnpm --filter @cartparty/api prisma:deploy && pnpm --filter @cartparty/api start:prod
     healthCheckPath: /health
     envVars:
       - fromGroup: cartparty-secrets
