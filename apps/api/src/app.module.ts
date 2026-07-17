@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module";
 import { CartModule } from "./cart/cart.module";
 import { HealthController } from "./health.controller";
+import { InternalController } from "./internal.controller";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 
@@ -21,6 +22,6 @@ import { RealtimeModule } from "./realtime/realtime.module";
     AuthModule,
     CartModule
   ],
-  controllers: [HealthController]
+  controllers: [HealthController, InternalController]
 })
 export class AppModule {}

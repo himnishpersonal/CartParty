@@ -3,7 +3,7 @@ services:
     name: cartparty-api
     runtime: node
     region: ohio
-    plan: starter
+    plan: free
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @cartparty/api prisma:generate && pnpm --filter @cartparty/api build
     preDeployCommand: pnpm --filter @cartparty/api prisma:deploy
     startCommand: pnpm --filter @cartparty/api start:prod
@@ -24,42 +24,21 @@ services:
       - key: NODE_ENV
         value: production
       - key: RUN_PRICE_SCHEDULER
-        value: "true"
-
-  - type: worker
-    name: cartparty-price-worker
-    runtime: node
-    region: ohio
-    plan: starter
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @cartparty/api prisma:generate && pnpm --filter @cartparty/api build
-    startCommand: pnpm --filter @cartparty/api start:worker
-    envVars:
-      - fromGroup: cartparty-secrets
-      - key: DATABASE_URL
-        fromDatabase:
-          name: cartparty-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: cartparty-redis
-          property: connectionString
-      - key: NODE_ENV
-        value: production
-      - key: RUN_PRICE_SCHEDULER
         value: "false"
+      - key: PRICE_SCAN_SECRET
+        sync: false
 
   - type: keyvalue
     name: cartparty-redis
     region: ohio
-    plan: starter
+    plan: free
     maxmemoryPolicy: noeviction
     ipAllowList: []
 
 databases:
   - name: cartparty-db
     region: ohio
-    plan: basic-256mb
+    plan: free
     databaseName: cartparty
     user: cartparty
 

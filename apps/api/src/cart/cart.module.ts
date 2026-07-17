@@ -35,6 +35,7 @@ import { PriceService } from "./services/price.service";
     ActivityController,
     ExtensionController
   ],
-  providers: [CartService, ActivityService, PriceService, PriceProcessor]
+  providers: [CartService, ActivityService, PriceService, PriceProcessor],
+  exports: [PriceService]
 })
 export class CartModule {}

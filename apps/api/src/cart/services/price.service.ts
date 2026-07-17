@@ -14,4 +14,8 @@ export class PriceService implements OnModuleInit {
     if (this.config.get("RUN_PRICE_SCHEDULER") === "false") return;
     await this.queue.add("scan", {}, { repeat: { pattern: "0 * * * *" }, jobId: "hourly-price-scan" });
   }
+
+  async enqueueScan() {
+    await this.queue.add("scan", {}, { jobId: `price-scan-${Date.now()}` });
+  }
 }

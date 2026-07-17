@@ -140,7 +140,8 @@ Vercel (apps/web)
        v
 Render API (apps/api) <-> Render PostgreSQL
        |
-       +-----------------> Render Key Value <-> Render price worker
+       +-----------------> Render Key Value
+GitHub Actions ---------> protected hourly price-scan trigger
 ```
 
 ### 1. Render infrastructure
@@ -149,18 +150,18 @@ The repository includes [render.yaml](/Users/himnish03/Documents/Projects/CartPa
 
 1. Managed PostgreSQL database.
 2. Private Redis-compatible Key Value instance.
-3. API web service with a `/health` check and Prisma migration pre-deploy step.
-4. Dedicated BullMQ price-worker service.
-5. Shared generated JWT secrets for API and worker.
+3. Free API web service with a `/health` check and Prisma migration pre-deploy step.
+4. Shared generated JWT secrets for the API.
 
 Push this repository to GitHub, then in Render select **New +** -> **Blueprint**, connect the repository, and approve the services in `render.yaml`. During creation, enter the final Vercel production URL when Render requests `FRONTEND_URL`. Render supplies `PORT`; do not set it manually.
+
+The Blueprint is intentionally configured with `plan: free` for every Render resource. The API process handles BullMQ jobs directly; there is no paid Render background worker.
 
 The Blueprint configures these commands:
 
 ```bash
 pnpm --filter @cartparty/api prisma:deploy
 pnpm --filter @cartparty/api start:prod
-pnpm --filter @cartparty/api start:worker
 ```
 
 Migrations run only in the API pre-deploy step. Do not run `prisma:seed` against production.
@@ -180,12 +181,20 @@ Redeploy the web app after changing either value because Vite embeds them at bui
 
 ### 3. Production environment variables
 
-The Blueprint automatically wires `DATABASE_URL`, `REDIS_URL`, `NODE_ENV`, and generated JWT secrets. `RUN_PRICE_SCHEDULER=true` is configured only on the API service, so there is one repeatable hourly job rather than duplicate schedules.
+The Blueprint automatically wires `DATABASE_URL`, `REDIS_URL`, `NODE_ENV`, and generated JWT secrets. `RUN_PRICE_SCHEDULER=false` is configured on the free API because Free instances sleep when idle. Instead, [price-scan.yml](/Users/himnish03/Documents/Projects/CartParty/.github/workflows/price-scan.yml) triggers the protected scan endpoint hourly.
 
 Set this Vercel origin on the Render API service during Blueprint setup or afterward:
 
 ```text
 FRONTEND_URL=https://YOUR-APP.vercel.app
+PRICE_SCAN_SECRET=<long random secret, also stored as a GitHub Actions secret>
+```
+
+Add these GitHub Actions repository secrets after the Render API is live:
+
+```text
+CARTPARTY_API_URL=https://YOUR-API.onrender.com
+CARTPARTY_PRICE_SCAN_SECRET=<same value as Render PRICE_SCAN_SECRET>
 ```
 
 `FRONTEND_URL` must exactly match the deployed Vercel origin so REST and Socket.io requests pass origin checks. Use a separate staging environment with separate database, Redis, and secrets before production.
@@ -194,11 +203,15 @@ FRONTEND_URL=https://YOUR-APP.vercel.app
 
 1. Run `pnpm typecheck` and `pnpm build`.
 2. Deploy the Render Blueprint, allow `prisma:deploy` to finish, and verify `GET /health` returns `200`.
-3. Deploy the worker and verify the `price-check` queue connects to Redis.
+3. Add the two GitHub Actions secrets and manually run **Trigger price scan** once to verify the queue connects to Redis.
 4. Deploy the Vercel web app with the final Render API URL.
 5. Set `FRONTEND_URL` on Render to the final Vercel URL and restart the API if it was not known during Blueprint creation.
 6. Verify registration, login, creating a workspace, saving a product, voting, commenting, WebSocket presence, and the extension against the production API.
 7. Configure a custom domain, database backups, error monitoring, and uptime monitoring before inviting real users.
+
+### Free-tier limitations
+
+This topology is for a portfolio/demo MVP, not a production launch. Render Free web services spin down after 15 minutes without inbound HTTP or WebSocket traffic and can take about a minute to restart. Free Render Postgres expires after 30 days and Free Key Value is in-memory only. Upgrade before collecting real user data.
 
 ## Intentionally Out of Scope
 
