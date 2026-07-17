@@ -160,7 +160,7 @@ The Blueprint is intentionally configured with `plan: free` for every Render res
 The Blueprint installs dependencies, builds the API, then applies pending migrations when the free API starts:
 
 ```bash
-pnpm install --frozen-lockfile
+pnpm install --frozen-lockfile --prod=false
 pnpm --filter @cartparty/api prisma:generate
 pnpm --filter @cartparty/api build
 pnpm --filter @cartparty/api prisma:deploy && pnpm --filter @cartparty/api start:prod
