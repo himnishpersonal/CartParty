@@ -12,6 +12,7 @@ import { PriceProcessor } from "./price.processor";
 import { ActivityService } from "./services/activity.service";
 import { CartService } from "./services/cart.service";
 import { PriceService } from "./services/price.service";
+import { RetailPriceService } from "./services/retail-price.service";
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { PriceService } from "./services/price.service";
     ActivityController,
     ExtensionController
   ],
-  providers: [CartService, ActivityService, PriceService, PriceProcessor],
+  providers: [CartService, ActivityService, PriceService, RetailPriceService, PriceProcessor],
   exports: [PriceService]
 })
 export class CartModule {}

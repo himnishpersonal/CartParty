@@ -46,6 +46,18 @@ button:disabled {
   opacity: 0.48;
 }
 
+button,
+.icon-button,
+.primary-button,
+.secondary-button,
+.workspace-button {
+  transition: background-color var(--motion-vote) ease, border-color var(--motion-vote) ease, color var(--motion-vote) ease, transform var(--motion-vote) ease;
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -104,13 +116,21 @@ h3 {
 
 .brand__mark {
   align-items: center;
-  background: var(--accent);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: var(--radius-chip);
-  color: var(--panel);
+  color: var(--ink);
   display: inline-flex;
   height: 34px;
   justify-content: center;
   width: 34px;
+}
+
+.brand__logo {
+  display: block;
+  height: 29px;
+  object-fit: contain;
+  width: 29px;
 }
 
 .topbar__right,
@@ -364,13 +384,17 @@ h3 {
 }
 
 .workspace-button.is-active {
-  background: var(--accent);
-  color: var(--panel);
+  background: var(--soft);
+  color: var(--ink);
 }
 
 .workspace-button.is-active > span {
-  background: color-mix(in srgb, var(--panel) 16%, transparent);
-  color: var(--panel);
+  background: color-mix(in srgb, var(--ink) 10%, var(--soft));
+  color: var(--ink);
+}
+
+.workspace-button--solo {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .new-workspace {
@@ -416,7 +440,7 @@ h3 {
 .board-header__copy h1 {
   font-size: var(--type-display);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   line-height: 1.15;
   margin-top: var(--space-2);
 }
@@ -463,6 +487,31 @@ h3 {
   padding: var(--space-2) var(--space-4);
 }
 
+.onboarding-page {
+  align-items: center;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--soft) 45%, var(--canvas)), var(--canvas));
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-5);
+}
+
+.onboarding-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-detail);
+  max-width: 460px;
+  padding: var(--space-7);
+  width: 100%;
+  animation: overlay-in var(--motion-drop) ease-out;
+}
+
+.onboarding-card .eyebrow { margin-top: var(--space-4); }
+.onboarding-card h1 { font-size: var(--type-display); margin-top: var(--space-2); }
+.onboarding-card > p:not(.eyebrow) { color: var(--muted); line-height: 1.5; margin: var(--space-3) 0 var(--space-5); }
+.onboarding-card form .primary-button { width: 100%; }
+
 .primary-button:hover {
   background: var(--accent-ink);
   border-color: var(--accent-ink);
@@ -503,6 +552,7 @@ h3 {
   top: calc(100% + var(--space-2));
   width: min(380px, calc(100vw - var(--space-6)));
   z-index: 35;
+  animation: overlay-in var(--motion-print) ease-out;
 }
 
 .invite-popover__header,
@@ -628,6 +678,7 @@ h3 {
   top: calc(100% + var(--space-2));
   width: 360px;
   z-index: 30;
+  animation: overlay-in var(--motion-print) ease-out;
 }
 
 .workspace-manage__header {
@@ -658,6 +709,7 @@ h3 {
   top: calc(100% + var(--space-2));
   width: 416px;
   z-index: 30;
+  animation: overlay-in var(--motion-print) ease-out;
 }
 
 .product-form__header {
@@ -1521,9 +1573,8 @@ h3 {
 
 .bag-mark {
   align-items: center;
-  background: var(--accent);
+  background: var(--highlight);
   border-radius: var(--radius-card);
-  color: var(--panel);
   display: flex;
   height: 152px;
   justify-content: center;
@@ -1531,6 +1582,13 @@ h3 {
   width: 152px;
   z-index: 2;
   animation: bag-receive 6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.bag-mark__logo {
+  display: block;
+  height: 132px;
+  object-fit: contain;
+  width: 132px;
 }
 
 .bag-mark__count {
@@ -1637,6 +1695,11 @@ h3 {
   14% { opacity: 1; }
   25% { opacity: 1; transform: translate(128px, -116px) rotate(0) scale(1); }
   30%, 100% { opacity: 0; transform: translate(142px, -128px) scale(0.75); }
+}
+
+@keyframes overlay-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 1260px) {

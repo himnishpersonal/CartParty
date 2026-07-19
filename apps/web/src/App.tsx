@@ -24,8 +24,6 @@ import { ActivityEvent, api, Product, User, VoteType, Workspace, WS_URL } from "
 import { PriceTag } from "./components/PriceTag";
 import { ReceiptFeed } from "./components/ReceiptFeed";
 
-type ConnectionState = "connected" | "reconnecting";
-
 export function App() {
   const [token, setToken] = useState(() => localStorage.getItem("cartparty.accessToken"));
   const [authMessage, setAuthMessage] = useState("");
@@ -37,7 +35,8 @@ export function App() {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [connection, setConnection] = useState<ConnectionState>("connected");
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  const [openAddProductFor, setOpenAddProductFor] = useState("");
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
   const [priceFlashId, setPriceFlashId] = useState<string | null>(null);
   const [presenceUsers, setPresenceUsers] = useState<User[]>([]);
@@ -67,7 +66,7 @@ export function App() {
       setWorkspaceId(currentWorkspace?.id ?? "");
       setError(null);
     } catch {
-      setError("Could not load this workspace. Check the API and try again.");
+      setError("Could not load this Party. Check the API and try again.");
     } finally {
       setLoadingWorkspaces(false);
     }
@@ -85,7 +84,7 @@ export function App() {
       setSelectedId((current) => data.some((product) => product.id === current) ? current : data[0]?.id ?? null);
       setError(null);
     } catch {
-      setError("Products did not load. Retry to bring the board back in sync.");
+      setError("Products did not load. Retry to refresh the board.");
     } finally {
       setLoadingProducts(false);
     }
@@ -97,7 +96,7 @@ export function App() {
       const { data } = await api.get<ActivityEvent[]>(`/workspaces/${id}/activity`);
       setActivity(data);
     } catch {
-      setError("Activity did not load. Retry to restore the live receipt.");
+      setError("Activity did not load. Retry to restore the activity list.");
     }
   }
 
@@ -114,7 +113,11 @@ export function App() {
   }
 
   useEffect(() => {
-    if (token) void loadWorkspaces();
+    if (!token) return;
+    void loadWorkspaces();
+    void api.get<{ onboardingCompletedAt: string | null }>("/auth/profile")
+      .then(({ data }) => setOnboardingComplete(Boolean(data.onboardingCompletedAt)))
+      .catch(() => setError("Could not load your profile. Please retry."));
   }, [token]);
 
   useEffect(() => {
@@ -124,6 +127,7 @@ export function App() {
       setWorkspaces([]);
       setProducts([]);
       setActivity([]);
+      setOnboardingComplete(null);
       setAuthMessage("Your session expired. Sign in again to keep working.");
     };
 
@@ -147,12 +151,7 @@ export function App() {
     if (!workspaceId || !token) return;
     const socket = io(WS_URL, { auth: { token }, reconnection: true });
     socket.emit("join_workspace", { workspaceId });
-    socket.on("connect", () => {
-      setConnection("connected");
-      socket.emit("join_workspace", { workspaceId });
-    });
-    socket.on("disconnect", () => setConnection("reconnecting"));
-    socket.on("connect_error", () => setConnection("reconnecting"));
+    socket.on("connect", () => socket.emit("join_workspace", { workspaceId }));
     socket.on("presence:updated", (users: User[]) => setPresenceUsers(users));
     socket.on("product:added", (product: Product) => {
       setProducts((items) => items.some((item) => item.id === product.id) ? items : [product, ...items]);
@@ -181,19 +180,21 @@ export function App() {
   }, [workspaceId, token]);
 
   if (!token) return <LoginScreen onLogin={login} message={authMessage} />;
+  if (onboardingComplete === false) return <Onboarding onComplete={async (party) => {
+    await api.post("/auth/onboarding/complete");
+    setOnboardingComplete(true);
+    setOpenAddProductFor(party.id);
+    await loadWorkspaces(party.id);
+  }} />;
 
   return (
     <div className="app-shell">
       <header className="topbar">
         <a className="brand" href="#board" aria-label="CartParty board">
-          <span className="brand__mark"><ShoppingBag size={18} strokeWidth={2.4} /></span>
+          <span className="brand__mark"><BagLogo /></span>
           <span>CartParty</span>
         </a>
         <div className="topbar__right">
-          <span className={`connection ${connection === "connected" ? "connection--online" : ""}`}>
-            <span /> {connection === "connected" ? "Live" : "Reconnecting"}
-          </span>
-          <span className="topbar__divider" />
           <span className="user-chip"><span className="avatar avatar--maya">{initials(currentUser?.name ?? sessionUser?.email ?? "User")}</span><span>{currentUser?.name ?? sessionUser?.email ?? "Account"}</span></span>
           <button className="icon-button" title="Sign out" aria-label="Sign out" onClick={() => {
             localStorage.clear();
@@ -201,13 +202,6 @@ export function App() {
           }}><LogOut size={17} /></button>
         </div>
       </header>
-
-      {connection === "reconnecting" ? (
-        <div className="connection-banner" role="status">
-          <span>Lost connection to the workspace. Reconnecting.</span>
-          <button onClick={() => location.reload()}><RefreshCw size={14} /> Retry</button>
-        </div>
-      ) : null}
 
       {error ? <ErrorBanner message={error} onRetry={retry} onClose={() => setError(null)} /> : null}
 
@@ -235,6 +229,8 @@ export function App() {
               void loadWorkspaces();
             }}
             onError={setError}
+            openAddProduct={openAddProductFor === workspaceId}
+            onAddProductOpened={() => setOpenAddProductFor("")}
           />
 
           {loadingProducts ? <ProductSkeletons /> : products.length ? (
@@ -279,7 +275,7 @@ export function App() {
               onError={setError}
             />
           ) : <DecisionSnapshot products={products} onSelect={() => setSelectedId(products[0]?.id ?? null)} />}
-          <ReceiptFeed events={activity} newEventIds={newEventIds} />
+          {((activeWorkspace?.members?.length ?? 1) >= 2) ? <ReceiptFeed events={activity} newEventIds={newEventIds} /> : null}
         </aside>
       </main>
     </div>
@@ -318,7 +314,7 @@ function LoginScreen({ onLogin, message }: { onLogin: (email: string, password: 
     <main className="login-page">
       <section className="login-panel">
         <div className="login-brand">
-          <span className="brand__mark"><ShoppingBag size={20} strokeWidth={2.4} /></span>
+          <span className="brand__mark"><BagLogo /></span>
           <span>CartParty</span>
         </div>
         <p className="eyebrow">Shared decisions, one cart</p>
@@ -336,7 +332,7 @@ function LoginScreen({ onLogin, message }: { onLogin: (email: string, password: 
           <Field label="Password" value={password} onChange={setPassword} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} />
           {error || message ? <p className="form-error" role="alert">{error || message}</p> : null}
           <button className="primary-button login-panel__submit" disabled={busy} type="submit">
-            {busy ? "Opening workspace..." : mode === "login" ? "Open CartParty" : "Create workspace account"}
+            {busy ? "Opening your Party..." : mode === "login" ? "Open CartParty" : "Create Party account"}
           </button>
         </form>
       </section>
@@ -356,11 +352,41 @@ function LoginBagAnimation() {
       <span className="bag-item bag-item--two"><Star size={15} /></span>
       <span className="bag-item bag-item--three"><Heart size={15} /></span>
       <div className="bag-mark">
-        <ShoppingBag size={72} strokeWidth={1.8} />
+        <img className="bag-mark__logo" src="/brand/cartparty-bag.png" alt="" />
         <span className="bag-mark__count">+</span>
       </div>
     </div>
   );
+}
+
+function BagLogo() {
+  return <img className="brand__logo" src="/brand/cartparty-bag.png" alt="" />;
+}
+
+function Onboarding({ onComplete }: { onComplete: (party: Workspace) => Promise<void> }) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!name.trim() || saving) return;
+    setSaving(true); setError("");
+    try {
+      const { data } = await api.post<Workspace>("/workspaces", { name: name.trim() });
+      await onComplete(data);
+    } catch {
+      setError("Your Party could not be created. Please try again.");
+      setSaving(false);
+    }
+  }
+  return <main className="onboarding-page"><section className="onboarding-card">
+    <span className="brand__mark"><BagLogo /></span><p className="eyebrow">Welcome to CartParty</p>
+    <h1>Start your first Party.</h1><p>Give this shopping decision a name. You can invite people whenever you’re ready.</p>
+    <form onSubmit={submit}><Field label="Party name" value={name} onChange={setName} autoComplete="off" />
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      <button className="primary-button" type="submit" disabled={saving || !name.trim()}>{saving ? "Creating..." : "Create Party"}</button>
+    </form>
+  </section></main>;
 }
 
 function Field({ label, value, onChange, type = "text", autoComplete }: { label: string; value: string; onChange: (value: string) => void; type?: string; autoComplete?: string }) {
@@ -392,26 +418,26 @@ function WorkspaceSidebar(props: {
       setName("");
       await props.onCreated(data.id);
     } catch {
-      props.onError("The workspace did not save. Keep the name and retry.");
+      props.onError("The Party did not save. Keep the name and retry.");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <aside className="sidebar" aria-label="Workspaces">
+    <aside className="sidebar" aria-label="Parties">
       <div className="sidebar__heading">
-        <p className="eyebrow">Workspaces</p>
+        <p className="eyebrow">Parties</p>
         <span>{props.workspaces.length.toString().padStart(2, "0")}</span>
       </div>
       <nav className="workspace-list">
         {props.loading && !props.workspaces.length ? <div className="sidebar-skeleton" /> : props.workspaces.map((workspace) => (
           <div className="workspace-group" key={workspace.id}>
             <button
-              className={`workspace-button ${workspace.id === props.activeWorkspaceId ? "is-active" : ""}`}
+              className={`workspace-button ${(workspace.members?.length ?? 1) < 2 ? "workspace-button--solo" : ""} ${workspace.id === props.activeWorkspaceId ? "is-active" : ""}`}
               onClick={() => props.onWorkspace(workspace.id)}
             >
-              <span>{initials(workspace.name)}</span>
+              {(workspace.members?.length ?? 1) >= 2 ? <span><Users size={16} aria-label="Shared Party" /></span> : null}
               <strong>{workspace.name}</strong>
               <small>{workspace.members?.length ?? 1}</small>
             </button>
@@ -419,17 +445,17 @@ function WorkspaceSidebar(props: {
         ))}
       </nav>
       <form className="new-workspace" onSubmit={createWorkspace}>
-        <label htmlFor="new-workspace">New workspace</label>
+        <label htmlFor="new-workspace">New Party</label>
         <div>
           <input id="new-workspace" placeholder="Name the decision" value={name} onChange={(event) => setName(event.target.value)} />
-          <button className="icon-button icon-button--accent" title="Create workspace" aria-label="Create workspace" type="submit" disabled={saving}><Plus size={17} /></button>
+          <button className="icon-button icon-button--accent" title="Create Party" aria-label="Create Party" type="submit" disabled={saving}><Plus size={17} /></button>
         </div>
       </form>
     </aside>
   );
 }
 
-function BoardHeader({ workspace, products, currentUserId, presenceUsers, onCreated, onMembersChanged, onWorkspaceChanged, onWorkspaceDeleted, onError }: {
+function BoardHeader({ workspace, products, currentUserId, presenceUsers, onCreated, onMembersChanged, onWorkspaceChanged, onWorkspaceDeleted, onError, openAddProduct, onAddProductOpened }: {
   workspace?: Workspace;
   products: Product[];
   currentUserId: string | null;
@@ -439,20 +465,22 @@ function BoardHeader({ workspace, products, currentUserId, presenceUsers, onCrea
   onWorkspaceChanged: () => Promise<void>;
   onWorkspaceDeleted: () => void;
   onError: (message: string) => void;
+  openAddProduct: boolean;
+  onAddProductOpened: () => void;
 }) {
   const picked = products.filter((product) => voteCounts(product).love >= 2 || voteCounts(product).favorite >= 2).length;
   return (
     <header className="board-header">
       <div className="board-header__copy">
-        <p className="eyebrow">Workspace</p>
-        <h1>{workspace?.name ?? "Choose a workspace"}</h1>
+        <p className="eyebrow">Party</p>
+        <h1>{workspace?.name ?? "Choose a Party"}</h1>
         <p>{decisionSubtitle(undefined, picked, products.length)}</p>
       </div>
       <div className="board-header__actions">
         <Presence users={presenceUsers} />
         <ManageWorkspace workspace={workspace} currentUserId={currentUserId} onChanged={onWorkspaceChanged} onDeleted={onWorkspaceDeleted} onError={onError} />
         <InviteMembers workspace={workspace} currentUserId={currentUserId} onMembersChanged={onMembersChanged} onError={onError} />
-        <CreateProduct workspaceId={workspace?.id ?? ""} onCreated={onCreated} onError={onError} />
+        <CreateProduct workspaceId={workspace?.id ?? ""} onCreated={onCreated} onError={onError} forceOpen={openAddProduct} onForceOpen={onAddProductOpened} />
       </div>
     </header>
   );
@@ -489,7 +517,7 @@ function ManageWorkspace({ workspace, currentUserId, onChanged, onDeleted, onErr
       await onChanged();
       setOpen(false);
     } catch {
-      onError("The workspace name did not update. Keep the name and retry.");
+      onError("The Party name did not update. Keep the name and retry.");
     } finally {
       setSaving(false);
     }
@@ -502,23 +530,23 @@ function ManageWorkspace({ workspace, currentUserId, onChanged, onDeleted, onErr
       await api.delete(`/workspaces/${activeWorkspace.id}`);
       onDeleted();
     } catch {
-      onError("The workspace could not be deleted. Retry when the connection is ready.");
+      onError("The Party could not be deleted. Retry when ready.");
       setSaving(false);
     }
   }
 
   return (
     <div className="workspace-manage">
-      <button className="icon-button" type="button" title="Manage workspace" aria-label="Manage workspace" onClick={() => setOpen((value) => !value)}><Pencil size={16} /></button>
+      <button className="icon-button" type="button" title="Manage Party" aria-label="Manage Party" onClick={() => setOpen((value) => !value)}><Pencil size={16} /></button>
       {open ? (
         <section className="workspace-manage__popover" role="dialog" aria-label={`Manage ${activeWorkspace.name}`}>
-          <div className="workspace-manage__header"><div><p className="eyebrow">Workspace settings</p><h2>Manage workspace</h2></div><button className="icon-button" type="button" title="Close" aria-label="Close workspace settings" onClick={() => setOpen(false)}><X size={17} /></button></div>
+          <div className="workspace-manage__header"><div><p className="eyebrow">Party settings</p><h2>Manage Party</h2></div><button className="icon-button" type="button" title="Close" aria-label="Close Party settings" onClick={() => setOpen(false)}><X size={17} /></button></div>
           <form onSubmit={rename}>
-            <Field label="Workspace name" value={name} onChange={setName} />
+            <Field label="Party name" value={name} onChange={setName} />
             <button className="primary-button" type="submit" disabled={saving || !name.trim()}><Check size={16} /> {saving ? "Saving..." : "Save name"}</button>
           </form>
           <div className="workspace-manage__danger">
-            {confirmingDelete ? <div className="product-delete-confirm" role="alert"><span>Delete this workspace and all of its products, votes, comments, price history, and activity?</span><div><button className="secondary-button" type="button" onClick={() => setConfirmingDelete(false)}>Keep workspace</button><button className="danger-button" type="button" disabled={saving} onClick={deleteWorkspace}><Trash2 size={15} /> {saving ? "Deleting..." : "Delete workspace"}</button></div></div> : <button className="text-button text-button--danger" type="button" onClick={() => setConfirmingDelete(true)}><Trash2 size={15} /> Delete workspace</button>}
+            {confirmingDelete ? <div className="product-delete-confirm" role="alert"><span>Delete this Party and all of its products, votes, comments, price history, and activity?</span><div><button className="secondary-button" type="button" onClick={() => setConfirmingDelete(false)}>Keep Party</button><button className="danger-button" type="button" disabled={saving} onClick={deleteWorkspace}><Trash2 size={15} /> {saving ? "Deleting..." : "Delete Party"}</button></div></div> : <button className="text-button text-button--danger" type="button" onClick={() => setConfirmingDelete(true)}><Trash2 size={15} /> Delete Party</button>}
           </div>
         </section>
       ) : null}
@@ -548,7 +576,7 @@ function InviteMembers({ workspace, currentUserId, onMembersChanged, onError }: 
     setNotice("");
     try {
       const { data } = await api.post<{ user: User }>(`/workspaces/${activeWorkspace.id}/members`, { email: email.trim() });
-      setNotice(`${data.user.name} can now see this workspace.`);
+      setNotice(`${data.user.name} can now see this Party.`);
       setEmail("");
       await onMembersChanged();
     } catch (error) {
@@ -558,7 +586,7 @@ function InviteMembers({ workspace, currentUserId, onMembersChanged, onError }: 
       if (status === 404) {
         setNotice("That email does not have a CartParty account yet.");
       } else if (status === 403) {
-        onError("Only workspace owners can invite people.");
+        onError("Only Party owners can invite people.");
       } else {
         setNotice("The invite did not send. Keep the email and retry.");
       }
@@ -575,7 +603,7 @@ function InviteMembers({ workspace, currentUserId, onMembersChanged, onError }: 
       {open ? (
         <section className="invite-popover" role="dialog" aria-label={`Invite people to ${activeWorkspace.name}`}>
           <div className="invite-popover__header">
-            <div><p className="eyebrow">Workspace members</p><h2>Invite people</h2></div>
+            <div><p className="eyebrow">Party members</p><h2>Invite people</h2></div>
             <button className="icon-button" title="Close" aria-label="Close invite dialog" type="button" onClick={() => setOpen(false)}><X size={17} /></button>
           </div>
           <p className="invite-popover__copy">Add someone who already has a CartParty account.</p>
@@ -605,7 +633,7 @@ function InviteMembers({ workspace, currentUserId, onMembersChanged, onError }: 
 
 function Presence({ users }: { users: User[] }) {
   return (
-    <div className="presence" title={users.length ? `${users.map((user) => user.name).join(", ")} are in this workspace` : "Connecting to workspace presence"}>
+    <div className="presence" title={users.length ? `${users.map((user) => user.name).join(", ")} are in this Party` : "Party members"}>
       <span className="presence__avatars">
         {users.slice(0, 4).map((user, index) => <i key={user.id} className={`avatar avatar--${index}`}>{initials(user.name)}</i>)}
       </span>
@@ -614,10 +642,11 @@ function Presence({ users }: { users: User[] }) {
   );
 }
 
-function CreateProduct({ workspaceId, onCreated, onError, triggerLabel = "Add product" }: { workspaceId: string; onCreated: () => void; onError: (message: string) => void; triggerLabel?: string }) {
+function CreateProduct({ workspaceId, onCreated, onError, triggerLabel = "Add product", forceOpen = false, onForceOpen }: { workspaceId: string; onCreated: () => void; onError: (message: string) => void; triggerLabel?: string; forceOpen?: boolean; onForceOpen?: () => void }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: "", storeName: "", productUrl: "", imageUrl: "", currentPrice: "", notes: "" });
+  useEffect(() => { if (forceOpen) { setOpen(true); onForceOpen?.(); } }, [forceOpen, onForceOpen]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -957,7 +986,7 @@ function EmptyWorkspace({ workspace, onCreated, onError }: {
     <section className="empty-state">
       <span className="empty-state__icon"><ShoppingBag size={24} /></span>
       <h2>No products yet.</h2>
-      <p>Add the first thing this workspace is deciding on.</p>
+      <p>Add the first thing this Party is deciding on.</p>
       <CreateProduct workspaceId={workspace?.id ?? ""} onCreated={onCreated} onError={onError} triggerLabel="Add the first product" />
     </section>
   );

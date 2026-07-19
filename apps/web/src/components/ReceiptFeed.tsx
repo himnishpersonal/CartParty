@@ -11,10 +11,9 @@ export function ReceiptFeed({ events, newEventIds = new Set() }: ReceiptFeedProp
       <div className="receipt__perforation" aria-hidden="true" />
       <header className="receipt__header">
         <div>
-          <p className="eyebrow">Live receipt</p>
-          <h2 id="activity-title">Workspace activity</h2>
+          <p className="eyebrow">Party activity</p>
+          <h2 id="activity-title">What your Party is doing</h2>
         </div>
-        <span className="receipt__live"><span /> LIVE</span>
       </header>
       <div className="receipt__rule" aria-hidden="true">********************************</div>
       <div className="receipt__body">
@@ -32,10 +31,6 @@ export function ReceiptFeed({ events, newEventIds = new Set() }: ReceiptFeedProp
           );
         })}
       </div>
-      <footer className="receipt__footer">
-        <span>{events.length.toString().padStart(2, "0")} EVENTS</span>
-        <span>SYNCED NOW</span>
-      </footer>
     </section>
   );
 }

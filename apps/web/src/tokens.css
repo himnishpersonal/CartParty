@@ -1,19 +1,21 @@
 @import url("https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,450;0,500;0,600;1,450&family=Space+Grotesk:wght@600&display=swap");
 
 :root {
-  --ink: #1a1714;
-  --muted: #6b6560;
-  --canvas: #fcfbf9;
-  --panel: #ffffff;
-  --line: #e7e3dc;
-  --accent: #2b4eff;
-  --accent-ink: #1b34c4;
-  --vote: #0e9f6e;
-  --pass: #b4271f;
-  --drop: #e8590c;
+  --ink: #361D2E;
+  --muted: #766a62;
+  --canvas: #fffaf5;
+  --panel: #fffdf9;
+  --line: #CBC0AD;
+  --accent: #361D2E;
+  --accent-ink: #24131e;
+  --highlight: #E1B07E;
+  --soft: #E5BE9E;
+  --vote: #86A397;
+  --pass: #9d4c4c;
+  --drop: #86A397;
 
-  --font-display: "Space Grotesk", "Arial Narrow", sans-serif;
-  --font-body: "Hanken Grotesk", Arial, sans-serif;
+  --font-display: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
 
   --type-display: 32px;
   --type-h2: 20px;
@@ -34,7 +36,7 @@
   --radius-button: 8px;
 
   --shadow-detail: 0 18px 48px color-mix(in srgb, var(--ink) 12%, transparent);
-  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--highlight) 72%, transparent);
 
   --motion-vote: 150ms;
   --motion-print: 200ms;

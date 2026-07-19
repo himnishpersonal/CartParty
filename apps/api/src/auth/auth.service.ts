@@ -42,6 +42,22 @@ export class AuthService {
     }
   }
 
+  async profile(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, onboardingCompletedAt: true }
+    });
+    return user;
+  }
+
+  async completeOnboarding(userId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { onboardingCompletedAt: new Date() },
+      select: { onboardingCompletedAt: true }
+    });
+  }
+
   private async tokens(userId: string, email: string) {
     const payload = { sub: userId, email };
     const [accessToken, refreshToken] = await Promise.all([
